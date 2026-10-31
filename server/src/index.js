@@ -90,9 +90,14 @@ async function startServer() {
     // Demo seeding is destructive and must be explicitly enabled in development only.
     const userCount = await User.countDocuments();
     const initializeEmptyDatabase = process.env.INITIALIZE_EMPTY_DATABASE === 'true';
-    if (userCount === 0 && process.env.SEED_DEMO_DATA === 'true' && (process.env.NODE_ENV !== 'production' || initializeEmptyDatabase)) {
+    const productionBootstrapConfigured = process.env.NODE_ENV === 'production'
+      && Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD)
+      && process.env.INITIALIZE_EMPTY_DATABASE !== 'false';
+    const shouldInitializeEmptyDatabase = process.env.SEED_DEMO_DATA === 'true'
+      || (process.env.NODE_ENV === 'production' && productionBootstrapConfigured);
+    if (userCount === 0 && shouldInitializeEmptyDatabase && (process.env.NODE_ENV !== 'production' || productionBootstrapConfigured)) {
       console.warn('[Startup] Initializing an empty database with demo accounts and sample data.');
-      await seedDatabase({ allowProduction: initializeEmptyDatabase });
+      await seedDatabase({ allowProduction: productionBootstrapConfigured || initializeEmptyDatabase });
     } else if (userCount === 0) {
       console.log('[Startup] Database is empty. Demo seed skipped; create an admin securely or enable SEED_DEMO_DATA=true for local development only.');
     }
