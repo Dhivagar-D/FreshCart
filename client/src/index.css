@@ -1,0 +1,48 @@
+@import 'maplibre-gl/dist/maplibre-gl.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.map-marker {
+  width: 18px;
+  height: 18px;
+  border: 3px solid white;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 35%);
+}
+
+.map-marker-buyer {
+  width: 22px;
+  height: 22px;
+  background: #2563eb;
+}
+
+.map-marker-vendor {
+  background: #059669;
+}
+
+.map-marker-excluded {
+  background: #e11d48;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

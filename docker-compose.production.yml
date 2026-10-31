@@ -1,0 +1,49 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: freshcart
+    volumes:
+      - freshcart-mongo-data:/data/db
+    networks:
+      - freshcart
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env.production
+    environment:
+      NODE_ENV: production
+      ALLOW_EPHEMERAL_DB: "false"
+      SEED_DEMO_DATA: "false"
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/freshcart?authSource=admin
+    expose:
+      - "5000"
+    depends_on:
+      - mongo
+    networks:
+      - freshcart
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - freshcart
+
+networks:
+  freshcart:
+
+volumes:
+  freshcart-mongo-data:

@@ -1,0 +1,11 @@
+{
+  "name": "freshcart-workspace",
+  "version": "1.0.0",
+  "description": "FreshCart – Hyperlocal B2B Marketplace for Fresh Produce Procurement",
+  "scripts": {
+    "server": "npm run start --prefix server",
+    "server:dev": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "seed": "npm run seed --prefix server"
+  }
+}
