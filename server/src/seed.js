@@ -9,8 +9,8 @@ import { connectDB } from './config/db.js';
 
 dotenv.config();
 
-export const seedDatabase = async () => {
-  if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is disabled in production.');
+export const seedDatabase = async ({ allowProduction = false } = {}) => {
+  if (process.env.NODE_ENV === 'production' && !allowProduction) throw new Error('Demo seeding is disabled in production.');
   if (process.env.SEED_DEMO_DATA !== 'true') throw new Error('Set SEED_DEMO_DATA=true to confirm destructive demo seeding. Existing users, vendors, products and settings will be deleted.');
   try {
     console.log('[Seed] Seeding FreshCart database with initial test data...');
@@ -30,12 +30,15 @@ export const seedDatabase = async () => {
 
     // Passwords hash
     const passwordHash = await bcrypt.hash('password123', 10);
-    const adminPasswordHash = await bcrypt.hash('admin123', 10);
+    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() || 'admin@freshcart.local';
+    const adminName = process.env.ADMIN_NAME?.trim() || 'FreshCart Administrator';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
 
     // 2. Admin User
     const adminUser = await User.create({
-      name: 'FreshCart Administrator',
-      email: 'admin@freshcart.local',
+      name: adminName,
+      email: adminEmail,
       passwordHash: adminPasswordHash,
       role: 'admin',
       phone: '+91 98888 00001',

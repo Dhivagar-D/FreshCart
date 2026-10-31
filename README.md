@@ -225,6 +225,13 @@ This update preserves the existing React + Express + MongoDB modular-monolith st
 5. For local sample data only, set `SEED_DEMO_DATA=true` in `server/.env` and start the server once; this seed deletes existing demo collections and creates predictable demo logins. Set it back to `false` after seeding. Demo credentials are for local development only. Never use the demo seed in production. For a non-demo database, set `ADMIN_NAME`, `ADMIN_EMAIL`, and a strong `ADMIN_PASSWORD` (14+ characters) in `server/.env`, then run `npm run create-admin --prefix server` once. This creates an admin only if that email does not already exist.
 6. Install dependencies in both `server` and `client`, then run the server and Vite client using the scripts at the repository root.
 
+For the first Render deployment only, the Blueprint initializes an empty
+Atlas database with Coimbatore demo users, vendors, and products. This is
+guarded by `INITIALIZE_EMPTY_DATABASE=true` and only runs when the database
+has no users. After the first successful deployment, set
+`SEED_DEMO_DATA=false` and `INITIALIZE_EMPTY_DATABASE=false` in Render so
+future restarts cannot initialize demo data.
+
 ### Checking live database updates in MongoDB Compass
 
 Connect Compass to the Docker database during local development:
