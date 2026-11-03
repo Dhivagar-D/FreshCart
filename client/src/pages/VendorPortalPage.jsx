@@ -80,6 +80,10 @@ export default function VendorPortalPage() {
 
   useEffect(() => {
     fetchData();
+    if (!token) return undefined;
+
+    const refreshInterval = window.setInterval(fetchData, 30000);
+    return () => window.clearInterval(refreshInterval);
   }, [token, user]);
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
@@ -110,8 +114,7 @@ export default function VendorPortalPage() {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to update order');
       }
-      // Refresh
-      fetchData();
+      await fetchData();
     } catch (err) {
       alert(err.message);
     }
@@ -222,6 +225,7 @@ export default function VendorPortalPage() {
           ? { ...current, products: current.products.map((item) => (String(item.productId) === String(data._id) ? { ...item, stock: data.stock } : item)) }
           : current
       );
+      await fetchData();
     } catch (err) {
       alert(err.message);
     }
