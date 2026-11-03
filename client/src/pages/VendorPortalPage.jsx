@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Store,
@@ -227,6 +227,57 @@ export default function VendorPortalPage() {
     }
   };
 
+  const analytics = useMemo(() => {
+    const statusCounts = orders.reduce((counts, order) => {
+      counts[order.status] = (counts[order.status] || 0) + 1;
+      return counts;
+    }, {});
+    const buyerIds = new Set(orders.map((order) => order.buyerId?._id || order.buyerId).filter(Boolean));
+    const deliveredOrders = orders.filter((order) => order.status === 'delivered');
+    const cancelledOrders = orders.filter((order) => order.status === 'cancelled');
+    const productSales = orders.reduce((sales, order) => {
+      order.items?.forEach((item) => {
+        const key = item.productId?._id || item.productId || item.name;
+        if (!sales[key]) sales[key] = { name: item.name, quantity: 0, revenue: 0 };
+        sales[key].quantity += Number(item.quantity) || 0;
+        sales[key].revenue += Number(item.subtotal) || 0;
+      });
+      return sales;
+    }, {});
+
+    const today = new Date();
+    const revenueByDay = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(today.getDate() - (6 - index));
+      const dateKey = date.toISOString().slice(0, 10);
+      return {
+        label: date.toLocaleDateString(undefined, { weekday: 'short' }),
+        value: orders
+          .filter((order) => order.createdAt?.slice(0, 10) === dateKey)
+          .reduce((sum, order) => sum + (Number(order.subtotal) || 0), 0),
+      };
+    });
+
+    const lowStockProducts = products.filter((product) => Number(product.stock) <= Math.max(Number(product.minOrderQty) || 1, 10));
+    return {
+      statusCounts,
+      uniqueBuyers: buyerIds.size,
+      deliveredOrders,
+      cancelledOrders,
+      productSales: Object.values(productSales).sort((a, b) => b.quantity - a.quantity).slice(0, 5),
+      revenueByDay,
+      maxRevenue: Math.max(...revenueByDay.map((day) => day.value), 1),
+      lowStockProducts,
+      inStockProducts: products.filter((product) => Number(product.stock) > 0).length,
+      outOfStockProducts: products.filter((product) => Number(product.stock) <= 0).length,
+      totalInventory: products.reduce((sum, product) => sum + (Number(product.stock) || 0), 0),
+      averageOrderValue: orders.length ? (Number(metrics?.grossSales) || 0) / orders.length : 0,
+      completionRate: orders.length ? (deliveredOrders.length / orders.length) * 100 : 0,
+      cancellationRate: orders.length ? (cancelledOrders.length / orders.length) * 100 : 0,
+    };
+  }, [orders, products, metrics]);
+
   return (
     <div className="space-y-6">
       {/* Vendor Top Banner */}
@@ -287,6 +338,125 @@ export default function VendorPortalPage() {
           <span className="text-[10px] text-amber-700 font-semibold">Requiring fulfillment</span>
         </div>
       </div>
+
+      {/* Vendor Analytics */}
+      <section className="space-y-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Vendor Analytics</h2>
+            <p className="text-xs text-slate-500 mt-1">Performance overview from your current orders and inventory.</p>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live data</span>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            ['Total Orders', metrics?.totalOrders || 0, 'All vendor orders', 'text-slate-900'],
+            ['Unique Buyers', analytics.uniqueBuyers, 'Distinct purchasing accounts', 'text-blue-700'],
+            ['Active Products', products.length, 'Current listings', 'text-emerald-700'],
+            ['Low Stock', analytics.lowStockProducts.length, 'Needs replenishment', 'text-amber-600'],
+          ].map(([label, value, caption, color]) => (
+            <div key={label} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{label}</span>
+              <div className={`text-xl font-black mt-1 ${color}`}>{value}</div>
+              <span className="text-[10px] text-slate-400">{caption}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Revenue Trend</h3>
+                <p className="text-[11px] text-slate-400">Daily gross sales, last 7 days</p>
+              </div>
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="h-36 flex items-end gap-2">
+              {analytics.revenueByDay.map((day) => (
+                <div key={day.label} className="flex-1 h-full flex flex-col justify-end items-center gap-1">
+                  <span className="text-[9px] text-slate-500">{day.value ? `₹${Math.round(day.value / 1000)}K` : '₹0'}</span>
+                  <div className="w-full max-w-10 bg-emerald-500 rounded-t-md min-h-1" style={{ height: `${Math.max((day.value / analytics.maxRevenue) * 100, 2)}%` }} />
+                  <span className="text-[10px] font-bold text-slate-400">{day.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs">
+              <span className="text-slate-500">Average order value</span>
+              <strong className="text-slate-900">₹{analytics.averageOrderValue.toFixed(2)}</strong>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Order Overview</h3>
+                <p className="text-[11px] text-slate-400">Current status distribution</p>
+              </div>
+              <CheckCircle className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['Delivered', analytics.statusCounts.delivered || 0, 'bg-emerald-50 text-emerald-700'],
+                ['Processing', (analytics.statusCounts.accepted || 0) + (analytics.statusCounts.preparing || 0), 'bg-blue-50 text-blue-700'],
+                ['Pending', analytics.statusCounts.pending || 0, 'bg-amber-50 text-amber-700'],
+                ['Cancelled', analytics.statusCounts.cancelled || 0, 'bg-rose-50 text-rose-700'],
+              ].map(([label, value, color]) => (
+                <div key={label} className={`rounded-xl p-3 ${color}`}>
+                  <span className="text-[10px] font-bold uppercase">{label}</span>
+                  <div className="text-xl font-black mt-1">{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-between text-xs">
+              <span className="text-slate-500">Completion rate</span>
+              <strong className="text-emerald-700">{analytics.completionRate.toFixed(1)}%</strong>
+              <span className="text-slate-500">Cancellation rate</span>
+              <strong className="text-rose-700">{analytics.cancellationRate.toFixed(1)}%</strong>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-black text-slate-900">Top Selling Products</h3>
+            <p className="text-[11px] text-slate-400 mb-4">Quantity sold across vendor orders</p>
+            <div className="space-y-3">
+              {analytics.productSales.length === 0 ? <p className="text-xs text-slate-400">No product sales recorded yet.</p> : analytics.productSales.map((product) => {
+                const maxQuantity = analytics.productSales[0].quantity || 1;
+                return (
+                  <div key={product.name}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-bold text-slate-700">{product.name}</span>
+                      <span className="text-slate-500">{product.quantity} units · ₹{product.revenue.toFixed(0)}</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(product.quantity / maxQuantity) * 100}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-black text-slate-900">Inventory & Fulfilment</h3>
+            <p className="text-[11px] text-slate-400 mb-4">Stock health and operational indicators</p>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-emerald-50 rounded-xl p-3"><span className="text-emerald-700 font-bold">In stock</span><strong className="block text-xl text-emerald-800">{analytics.inStockProducts}</strong></div>
+              <div className="bg-rose-50 rounded-xl p-3"><span className="text-rose-700 font-bold">Out of stock</span><strong className="block text-xl text-rose-800">{analytics.outOfStockProducts}</strong></div>
+              <div className="bg-slate-50 rounded-xl p-3"><span className="text-slate-500 font-bold">Total quantity</span><strong className="block text-xl text-slate-800">{analytics.totalInventory}</strong></div>
+              <div className="bg-amber-50 rounded-xl p-3"><span className="text-amber-700 font-bold">Low stock</span><strong className="block text-xl text-amber-800">{analytics.lowStockProducts.length}</strong></div>
+            </div>
+            {analytics.lowStockProducts.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2">
+                {analytics.lowStockProducts.slice(0, 4).map((product) => (
+                  <span key={product._id} className="rounded-full bg-amber-50 text-amber-800 px-2.5 py-1 text-[10px] font-bold">{product.name}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Navigation Pills */}
       <div className="flex items-center gap-3 border-b border-slate-200 pb-2">
